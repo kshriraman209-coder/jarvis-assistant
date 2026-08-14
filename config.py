@@ -10,7 +10,7 @@ OLLAMA_KEEP_ALIVE = "5m"
 
 # Cloud brain (optional). Set PROVIDER="gemini" and put your key here.
 # Get a free key at https://aistudio.google.com/apikey
-PROVIDER = "gemini"            # "gemini" | "ollama"
+PROVIDER = "ollama"            # "gemini" | "ollama"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-2.0-flash"
 GEMINI_URL = (
