@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.A.R.V.I.S.</title>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #0f1620;
+    --line: #1e2a3a;
+    --cyan: #35d0ff;
+    --cyan-dim: rgba(53, 208, 255, 0.15);
+    --green: #3fffa0;
+    --amber: #ffc24b;
+    --red: #ff5c5c;
+    --text: #d7e4f0;
+    --muted: #7a8ba0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(1200px 600px at 70% -10%, #10202e 0%, var(--bg) 55%);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(20,32,46,.9), rgba(10,14,20,.6));
+  }
+  .arc {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--cyan), #0b8bb5 35%, transparent 40%, transparent 55%, var(--cyan) 75%, #0b8bb5);
+    -webkit-mask: radial-gradient(circle, transparent 48%, black 49%);
+            mask: radial-gradient(circle, transparent 48%, black 49%);
+    animation: spin 6s linear infinite;
+    box-shadow: 0 0 18px var(--cyan-dim);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .title { font-weight: 600; font-size: 20px; letter-spacing: 3px; color: var(--cyan); text-shadow: 0 0 12px var(--cyan-dim); }
+  .subtitle { font-size: 12px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .badge {
+    font-size: 12px; padding: 5px 10px; border-radius: 20px;
+    border: 1px solid var(--line); background: var(--panel);
+    cursor: pointer; user-select: none; transition: all .15s;
+  }
+  .badge.on { color: var(--green); border-color: rgba(63,255,160,.4); }
+  .badge.off { color: var(--muted); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .badge.on .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .badge.off .dot { background: var(--muted); }
+  .badge .toggle { opacity:.8; margin-left:6px; font-size:10px; }
+  .model-sel {
+    font-size: 12px; padding: 5px 10px; border-radius: 20px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--cyan);
+    cursor: pointer; outline: none; user-select: none;
+  }
+  .model-sel:hover, .model-sel:focus { border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan-dim); }
+
+  .layout { display: grid; grid-template-columns: 280px 1fr; gap: 18px; padding: 18px 22px; height: calc(100% - 70px); }
+  .sidebar, .chatbox {
+    background: rgba(15,22,32,.75);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    backdrop-filter: blur(6px);
+  }
+  .sidebar { padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .side-title { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .stat {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(10,14,20,.5);
+  }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .stat .v { font-size: 13px; font-weight: 600; color: var(--cyan); }
+  .cmd {
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+    font-size: 12.5px; color: var(--text); background: rgba(10,14,20,.5); transition: all .15s;
+    text-align: left;
+  }
+  .cmd:hover { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+
+  .chatbox { display: flex; flex-direction: column; min-height: 0; }
+  .chathead {
+    padding: 10px 18px; border-bottom: 1px solid var(--line);
+    font-size: 12px; color: var(--muted); display:flex; gap: 18px; align-items:center;
+  }
+  .chathead b { color: var(--cyan); font-weight: 600; }
+  .credit {
+    text-align: center; font-size: 11px; color: var(--muted);
+    padding: 6px 0; border-top: 1px solid var(--line); letter-spacing: 1px;
+  }
+  .credit b { color: var(--cyan); font-weight: 600; }
+  #messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 80%; padding: 11px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user {
+    align-self: flex-end; background: linear-gradient(135deg, #123548, #0d2736);
+    border: 1px solid #1b4a63; border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.3);
+  }
+  .msg.jarvis {
+    align-self: flex-start; background: rgba(20,30,44,.85); border: 1px solid var(--line);
+    border-bottom-left-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.3);
+  }
+  .msg .who { font-size: 11px; color: var(--muted); margin-bottom: 4px; letter-spacing: 1px; }
+  .msg.user .who { color: var(--cyan); }
+  .msg .action-tag { color: var(--amber); font-size: 11px; }
+  .chip {
+    align-self: flex-start; font-size: 11px; color: var(--muted);
+    padding: 5px 10px; border-radius: 12px; border: 1px dashed var(--line);
+  }
+  .typing { display: inline-flex; gap: 4px; padding: 4px 2px; }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); animation: bounce 1.2s infinite; }
+  .typing i:nth-child(2){ animation-delay:.15s; } .typing i:nth-child(3){ animation-delay:.3s; }
+  @keyframes bounce { 50% { transform: translateY(-4px); opacity:.4; } }
+
+  .inputbar { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--line); align-items: center; }
+  #textin {
+    flex: 1; background: rgba(10,14,20,.7); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 15px; color: var(--text); font-size: 14px; outline: none;
+  }
+  #textin:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-dim); }
+  .btn {
+    border: 1px solid var(--line); border-radius: 10px; background: rgba(10,14,20,.7);
+    color: var(--cyan); padding: 12px 18px; cursor: pointer; font-size: 14px; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 6px; user-select: none;
+  }
+  .btn:hover { border-color: var(--cyan); background: var(--cyan-dim); }
+  .btn.icon { width: 46px; justify-content: center; padding: 12px 0; }
+  .btn.mic.listening { background: #3a2a08; border-color: var(--amber); color: var(--amber); animation: pulse 1.2s infinite; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(5,8,12,.8); display: none;
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px; width: 420px; max-width: 92%;
+  }
+  .modal h3 { color: var(--cyan); margin-bottom: 12px; font-weight: 600; }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .modal code {
+    display: block; background: rgba(10,14,20,.8); border: 1px solid var(--line);
+    padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--green);
+    margin: 6px 0; word-break: break-all;
+  }
+  .modal .btn { margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="arc"></div>
+  <div>
+    <div class="title">J.A.R.V.I.S.</div>
+    <div class="subtitle">Local AI Assistant &middot; Developed by A. Kritthik Shriraman</div>
+  </div>
+  <div class="spacer"></div>
+  <span class="badge" id="ollamaBadge"><span class="dot"></span><span id="ollamaText">checking Ollama…</span></span>
+  <select id="modelSel" class="model-sel" title="Choose AI model"><option value="">Loading…</option></select>
+  <span class="badge" id="voiceBadge" title="Toggle voice replies"><span class="dot"></span><span id="voiceText">Audio on</span><span class="toggle">&#9658;</span></span>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="side-title">System</div>
+    <div class="stat"><span class="k">AI brain</span><span class="v" id="modelName">…</span></div>
+    <div class="stat"><span class="k">Drive</span><span class="v" id="driveLabel">local</span></div>
+
+    <div class="side-title">Ask JARVIS</div>
+    <button class="cmd" data-txt="What time is it?">&#9200; What time is it?</button>
+    <button class="cmd" data-txt="System status">&#9881; System status</button>
+    <button class="cmd" data-txt="Take a screenshot">&#128247; Take a screenshot</button>
+    <button class="cmd" data-txt="Search Google for today's top news">&#128269; Google search</button>
+    <button class="cmd" data-txt="Search YouTube for lofi music">&#127916; YouTube search</button>
+    <button class="cmd" data-txt="Search images of cats">&#128049; Image search</button>
+
+    <div class="side-title">Do things</div>
+    <button class="cmd" data-txt="Open Chrome">&#127760; Open Chrome</button>
+    <button class="cmd" data-txt="Open Notepad">&#128221; Open Notepad</button>
+    <button class="cmd" data-txt="Open Spotify">&#127911; Open Spotify</button>
+    <button class="cmd" data-txt="Open WhatsApp">&#128172; Open WhatsApp</button>
+    <button class="cmd" data-txt="Open file explorer">&#128193; File explorer</button>
+    <button class="cmd" data-txt="Move the mouse to 960, 500">&#128073; Center mouse</button>
+    <button class="cmd" data-txt="Scroll down">&#11015; Scroll down</button>
+    <button class="cmd" data-txt="Volume up">&#128266; Volume up</button>
+    <button class="cmd" data-txt="Lock the screen">&#128274; Lock screen</button>
+
+    <div class="side-title">Sample chat</div>
+    <button class="cmd" data-txt="Tell me a fun fact about space">&#11088; Space fact</button>
+    <button class="cmd" data-txt="Explain how a jet engine works">&#9992; Jet engines</button>
+  </div>
+
+  <div class="chatbox">
+    <div class="chathead">
+      <span>Model: <b id="hhModel">…</b></span>
+      <span>Turns: <b id="hhTurns">0</b></span>
+      <span id="hhState">ready</span>
+    </div>
+    <div id="messages"></div>
+    <div class="credit">Developed by <b>A. Kritthik Shriraman</b> &middot; © 2026</div>
+    <div class="inputbar">
+      <button class="btn icon mic" id="micBtn" title="Speak to JARVIS">&#127908;</button>
+      <input id="textin" type="text" placeholder="Ask, command, or search… (Enter to send)" autocomplete="off">
+      <button class="btn" id="sendBtn">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const api = { chat: "/api/chat", speech: "/api/speech", status: "/api/status" };
+const $ = (id) => document.getElementById(id);
+const msgbox = $("messages");
+let voiceOn = true;
+let turns = 0;
+const modelSel = $("modelSel");
+const saved = localStorage.getItem("jarvis-history");
+if (saved) { try { JSON.parse(saved).forEach(m => addMsg(m.role, m.text, m.meta)); } catch (e) {} }
+
+function saveHistory() {
+  const items = [];
+  msgbox.querySelectorAll(".msg").forEach((el) => {
+    const role = el.classList.contains("user") ? "user" : "jarvis";
+    const text = el.childNodes[el.childNodes.length - 1].textContent;
+    const meta = el.querySelector(".action-tag") ? "action" : null;
+    items.push({ role, text, meta });
+  });
+  localStorage.setItem("jarvis-history", JSON.stringify(items.slice(-100)));
+}
+
+function addMsg(role, text, meta) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  const who = document.createElement("div");
+  who.className = "who";
+  who.textContent = role === "user" ? "YOU" : "J.A.R.V.I.S.";
+  div.appendChild(who);
+  if (meta === "action") {
+    const tag = document.createElement("div");
+    tag.className = "action-tag";
+    tag.textContent = "SYSTEM ACTION EXECUTED";
+    div.appendChild(tag);
+  }
+  div.appendChild(document.createTextNode(text));
+  msgbox.appendChild(div);
+  msgbox.scrollTop = msgbox.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  const div = document.createElement("div");
+  div.className = "chip";
+  div.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  div.id = "typing";
+  msgbox.appendChild(div);
+  msgbox.scrollTop = msgbox.scrollHeight;
+}
+function hideTyping() {
+  const t = $("typing");
+  if (t) t.remove();
+}
+function setState(s) {
+  $("hhState").textContent = s;
+  if (s === "thinking…") $("hhState").style.color = "var(--amber)";
+  else $("hhState").style.color = "var(--muted)";
+}
+
+let playToken = 0;
+function speak(text) {
+  if (!voiceOn) return;
+  const token = ++playToken;
+  try {
+    const url = api.speech + "?text=" + encodeURIComponent(text);
+    const audio = new Audio(url);
+    audio.onerror = () => { if (token === playToken) fallbackSpeak(text); };
+    const started = audio.play();
+    if (started && started.then) started.catch(() => { if (token === playToken) fallbackSpeak(text); });
+  } catch (e) {
+    if (token === playToken) fallbackSpeak(text);
+  }
+}
+
+function fallbackSpeak(text) {
+  try {
+    const s = new SpeechSynthesisUtterance(text);
+    s.rate = 1.05; s.pitch = 0.9;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(s);
+  } catch (e) { /* no audio */ }
+}
+
+async function send(text) {
+  text = (text || "").trim();
+  if (!text) return;
+  addMsg("user", text);
+  saveHistory();
+  $("textin").value = "";
+  showTyping();
+  setState("thinking…");
+  try {
+    const r = await fetch(api.chat, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await r.json();
+    hideTyping();
+    const meta = data.action ? "action" : null;
+    addMsg("jarvis", data.reply, meta);
+    turns++;
+    $("hhTurns").textContent = turns;
+    setState("ready");
+    saveHistory();
+    speak(data.reply);
+    if (autoListen) setTimeout(() => micBtn.click(), 900);
+  } catch (e) {
+    hideTyping();
+    setState("connection error");
+    addMsg("jarvis", "Network error: " + e.message);
+  }
+}
+
+/* ---- Voice input ---- */
+let recognizing = false;
+let autoListen = false;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn = $("micBtn");
+
+if (SR) {
+  const rec = new SR();
+  rec.lang = "en-US";
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  rec.onstart = () => { recognizing = true; micBtn.classList.add("listening"); micBtn.title = "Stop listening"; };
+  rec.onerror = (e) => { recognizing = false; micBtn.classList.remove("listening"); };
+  rec.onend = () => { recognizing = false; micBtn.classList.remove("listening"); };
+  rec.onresult = (e) => {
+    const t = e.results[0][0].transcript;
+    $("textin").value = t;
+    send(t);
+  };
+  micBtn.onclick = () => {
+    if (recognizing) { rec.stop(); return; }
+    try { rec.start(); } catch (e) { /* busy */ }
+  };
+} else {
+  micBtn.title = "Microphone needs Chrome/Edge";
+  micBtn.disabled = true;
+}
+
+$("sendBtn").onclick = () => send($("textin").value);
+$("textin").addEventListener("keydown", (e) => { if (e.key === "Enter") send(e.target.value); });
+document.querySelectorAll(".cmd").forEach((b) => b.onclick = () => send(b.dataset.txt));
+
+/* Voice reply toggle */
+$("voiceBadge").onclick = () => {
+  voiceOn = !voiceOn;
+  if (voiceOn && !SR) voiceOn = false;
+  $("voiceText").textContent = voiceOn ? "Audio on" : "Audio off";
+  $("voiceBadge").classList.toggle("off", !voiceOn && !SR);
+  $("voiceBadge").classList.toggle("on", voiceOn || !SR);
+  if (!voiceOn) try { speechSynthesis.cancel(); } catch (e) {}
+};
+
+function fillModelSelect(models, active) {
+  modelSel.innerHTML = "";
+  (models || []).forEach((m) => {
+    const o = document.createElement("option");
+    o.value = m.key;
+    o.textContent = m.label;
+    if (m.key === active) o.selected = true;
+    modelSel.appendChild(o);
+  });
+}
+
+modelSel.onchange = async () => {
+  const chosen = modelSel.value;
+  if (!chosen) return;
+  modelSel.disabled = true;
+  setState("switching…");
+  try {
+    const r = await fetch("/api/mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: chosen }),
+    });
+    const s = await r.json();
+    if (!r.ok) throw new Error(s.error || "switch failed");
+    $("modelName").textContent = s.model;
+    $("hhModel").textContent = s.model;
+    $("driveLabel").textContent = (s.mode === "ollama" ? "local" : "cloud") + " · " + s.mode;
+    setState("ready");
+    addMsg("jarvis", "Brain switched to " + s.model + " (" + s.mode + ").");
+  } catch (e) {
+    setState("switch failed");
+    addMsg("jarvis", "Could not switch model: " + e.message);
+  } finally {
+    modelSel.disabled = false;
+  }
+};
+
+(async () => {
+  try {
+    const r = await fetch(api.status);
+    const s = await r.json();
+    $("modelName").textContent = s.model;
+    $("hhModel").textContent = s.model;
+    fillModelSelect(s.models, s.mode);
+    if (s.ollama) {
+      $("ollamaText").textContent = "Brain online";
+      $("ollamaBadge").classList.add("on");
+    } else {
+      $("ollamaText").textContent = "Brain offline";
+      $("ollamaBadge").classList.add("off");
+    }
+    $("driveLabel").textContent = (s.local ? "local" : "cloud") + " · " + s.mode;
+  } catch (e) { /* offline */ }
+  if (!msgbox.querySelector(".msg")) {
+    addMsg("jarvis", "All systems are online, sir. Ask me anything, or click the microphone and speak with me.");
+    speak("Good to see you, sir. All systems are online and ready.");
+  }
+})();
+</script>
+</body>
+</html>

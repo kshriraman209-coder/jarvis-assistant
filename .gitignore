@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+web/tts_cache/
+.env
