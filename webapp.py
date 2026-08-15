@@ -1,5 +1,6 @@
 import hashlib
 import os
+import sys
 import threading
 
 from flask import Flask, jsonify, request, send_file
@@ -10,8 +11,19 @@ import main as jarvis_core
 
 app = Flask(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-AUDIO_DIR = os.path.join(BASE_DIR, "web", "tts_cache")
+# When frozen with PyInstaller, static files live inside the bundle (--add-data)
+# and the writable TTS cache goes to a user folder instead of the bundle temp dir.
+if getattr(sys, "frozen", False):
+    BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    _cache_root = os.path.join(
+        os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+        "JARVIS", "tts_cache",
+    )
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    _cache_root = os.path.join(BASE_DIR, "web", "tts_cache")
+
+AUDIO_DIR = _cache_root
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 _session_lock = threading.Lock()
@@ -42,15 +54,44 @@ def _set_best_voice(engine):
         pass
 
 
-def synthesize(text):
+def _synthesize_edge(text, path):
+    """Synthesize with Microsoft Edge neural TTS (human-like). MP3."""
+    import asyncio
+    import edge_tts
+    from edge_tts import Communicate
+
+    def _run():
+        async def _inner():
+            com = Communicate(text, config.TTS_EDGE_VOICE,
+                              rate=config.TTS_EDGE_RATE)
+            await com.save(path)
+        asyncio.run(_inner())
+
+    _run()
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+
+def synthesize(text, prefer_edge=True):
     key = hashlib.md5(text.encode("utf-8")).hexdigest()
-    path = os.path.join(AUDIO_DIR, f"{key}.wav")
-    if os.path.exists(path):
-        return path
+    if config.TTS_ENGINE == "edge" and prefer_edge:
+        path = os.path.join(AUDIO_DIR, f"{key}.mp3")
+        if os.path.exists(path):
+            return path
+        import pyttsx3
+        # Try the neural voice first; fall back to the local SAPI voice.
+        with _tts_lock:
+            try:
+                if _synthesize_edge(text, path):
+                    return path
+            except Exception:
+                pass
     import pyttsx3
     # pyttsx3's SAPI driver is not thread-safe, so build a fresh engine per call.
     with _tts_lock:
         try:
+            path = os.path.join(AUDIO_DIR, f"{key}.wav")
+            if os.path.exists(path):
+                return path
             engine = pyttsx3.init()
             _set_best_voice(engine)
             engine.setProperty("rate", config.TTS_RATE)
@@ -74,7 +115,8 @@ def api_speech():
     if not text:
         return jsonify({"error": "no text"}), 400
     path = synthesize(text)
-    return send_file(path, mimetype="audio/wav")
+    mime = "audio/mpeg" if path.lower().endswith(".mp3") else "audio/wav"
+    return send_file(path, mimetype=mime)
 
 
 @app.post("/api/chat")

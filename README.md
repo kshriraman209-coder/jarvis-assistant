@@ -24,7 +24,20 @@ ollama pull qwen2.5:3b
 
 ---
 
-## 1. Get the code
+## 1. EASIEST: pre-built app (`JARVIS.exe`)
+
+Windows users who don't want to install anything can just run:
+
+- **`JARVIS.exe`** — double-click. It starts the web app, opens the browser,
+  and keeps a "Jarvis" wake-word listener alive. One file, no Python needed.
+- **`run.bat`** — same thing, running from source.
+
+> The 107 MB `dist\JARVIS.exe` can be built yourself with
+> `python -m pip install pyinstaller` then `make_exe.bat` (optional).
+
+## 2. Classic: run from source
+
+### Get the code
 
 ```bash
 git clone https://github.com/kshriraman209-coder/jarvis-assistant.git
@@ -32,6 +45,9 @@ cd jarvis-assistant
 ```
 
 (Or download the ZIP from the repo page and unzip it.)
+
+> **One-time setup:** run `setup.bat` — it checks Python + Ollama, installs the
+> Python packages, and pulls the AI model automatically.
 
 ---
 

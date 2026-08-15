@@ -35,7 +35,12 @@ GOODBYE = "Signing off. Goodbye, sir."
 
 TTS_RATE = 175
 TTS_VOLUME = 1.0
-# Prefer a British-accent voice (classic JARVIS feel). Falls back to any voice.
+# Human-like neural voice via Microsoft Edge TTS (requires internet once).
+# Falls back to Windows SAPI (pyttsx3) if offline.
+TTS_ENGINE = "edge"            # "edge" | "sapi"
+TTS_EDGE_VOICE = "en-GB-ThomasNeural"
+TTS_EDGE_RATE = "+8%"          # speech rate adjustment for a calm, measured tone
+# Windows SAPI voice preference (fallback): British accent, classic JARVIS feel.
 TTS_VOICE_PREFERENCE = "hazel"
 TTS_VOICE_FALLBACKS = ("zira", "david", "mark", "aria")
 
