@@ -18,6 +18,30 @@ _session_lock = threading.Lock()
 _tts_lock = threading.Lock()
 
 
+def _set_best_voice(engine):
+    """Pick a voice by name preference (accent), defaulting to any available."""
+    try:
+        voices = engine.getProperty("voices")
+        if not voices:
+            return
+        lowered = {v.name.lower(): v for v in voices}
+        picked = None
+        for name in (
+            (config.TTS_VOICE_PREFERENCE,) + config.TTS_VOICE_FALLBACKS
+        ):
+            for key, voice in lowered.items():
+                if name in key:
+                    picked = voice
+                    break
+            if picked:
+                break
+        if picked is None:
+            picked = voices[0]
+        engine.setProperty("voice", picked.id)
+    except Exception:
+        pass
+
+
 def synthesize(text):
     key = hashlib.md5(text.encode("utf-8")).hexdigest()
     path = os.path.join(AUDIO_DIR, f"{key}.wav")
@@ -28,6 +52,7 @@ def synthesize(text):
     with _tts_lock:
         try:
             engine = pyttsx3.init()
+            _set_best_voice(engine)
             engine.setProperty("rate", config.TTS_RATE)
             engine.setProperty("volume", config.TTS_VOLUME)
             engine.save_to_file(text, path)
@@ -68,6 +93,13 @@ def api_chat():
             return jsonify({"reply": reply, "action": not reply.startswith("I'm sorry,")}), 200
 
     return jsonify({"reply": config.UNKNOWN_REPLY, "action": False}), 200
+
+
+@app.post("/api/clear")
+def api_clear():
+    with _session_lock:
+        brain.history.clear()
+    return jsonify({"cleared": True}), 200
 
 
 @app.get("/api/status")

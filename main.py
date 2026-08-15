@@ -20,12 +20,38 @@ def init_tts():
     global _tts
     try:
         _tts = pyttsx3.init()
+        _set_best_voice(_tts)
         _tts.setProperty("rate", config.TTS_RATE)
         _tts.setProperty("volume", config.TTS_VOLUME)
         return True
     except Exception as e:
         print(f"[WARN] TTS unavailable: {e}")
         return False
+
+
+def _set_best_voice(engine):
+    """Pick a voice by name preference (accent), defaulting to any available."""
+    try:
+        voices = engine.getProperty("voices")
+        if not voices:
+            return
+        lowered = {v.name.lower(): v for v in voices}
+        picked = None
+        for name in (
+            (config.TTS_VOICE_PREFERENCE,) + config.TTS_VOICE_FALLBACKS
+        ):
+            for key, voice in lowered.items():
+                if name in key:
+                    picked = voice
+                    break
+            if picked:
+                break
+        if picked is None:
+            picked = voices[0]
+        engine.setProperty("voice", picked.id)
+        print(f"[TTS] Voice: {picked.name}")
+    except Exception:
+        pass
 
 
 def speak(text):
@@ -193,6 +219,15 @@ def _num(text):
 
 def handle_command(text):
     low = text.lower()
+
+    # ---- Creator / identity ----
+    if re.search(
+        r"who\s+(created|built|made|developed|designed|coded|programmed)\s+(you|this|jarvis)|"
+        r"your\s+(creator|developer|maker|owner)|"
+        r"developed by you|who made you",
+        low,
+    ):
+        return f"I was designed and developed by A. Kritthik Shriraman, sir."
 
     # ---- System info ----
     if re.search(r"\b(time|clock)\b", low):

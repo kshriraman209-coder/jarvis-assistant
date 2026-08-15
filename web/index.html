@@ -133,6 +133,9 @@
   .btn.icon { width: 46px; justify-content: center; padding: 12px 0; }
   .btn.mic.listening { background: #3a2a08; border-color: var(--amber); color: var(--amber); animation: pulse 1.2s infinite; }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+  .btn.danger { color: var(--red); }
+  .btn.danger:hover { border-color: var(--red); background: rgba(255,92,92,.12); }
   @keyframes pulse { 50% { opacity: .35; } }
 
   ::-webkit-scrollbar { width: 8px; }
@@ -207,6 +210,8 @@
       <span>Model: <b id="hhModel">…</b></span>
       <span>Turns: <b id="hhTurns">0</b></span>
       <span id="hhState">ready</span>
+      <span class="spacer"></span>
+      <button id="clearBtn" class="btn small danger" title="Clear chat history (privacy)">Clear chat</button>
     </div>
     <div id="messages"></div>
     <div class="credit">Developed by <b>A. Kritthik Shriraman</b> &middot; © 2026</div>
@@ -361,6 +366,20 @@ if (SR) {
 
 $("sendBtn").onclick = () => send($("textin").value);
 $("textin").addEventListener("keydown", (e) => { if (e.key === "Enter") send(e.target.value); });
+
+/* Clear chat history (localStorage + server memory) */
+$("clearBtn").onclick = async () => {
+  if (!confirm("Clear the entire chat history? This cannot be undone.")) return;
+  localStorage.removeItem("jarvis-history");
+  msgbox.innerHTML = "";
+  turns = 0;
+  $("hhTurns").textContent = "0";
+  setState("cleared");
+  try {
+    await fetch("/api/clear", { method: "POST" });
+  } catch (e) { /* server memory best-effort */ }
+  addMsg("jarvis", "Chat history cleared, sir. This conversation is now private.");
+};
 document.querySelectorAll(".cmd").forEach((b) => b.onclick = () => send(b.dataset.txt));
 
 /* Voice reply toggle */

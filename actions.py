@@ -1,9 +1,12 @@
+import ctypes
 import datetime
 import os
 import shutil
 import subprocess
 import sys
 import threading
+import time
+from ctypes import wintypes
 import webbrowser
 
 import psutil
@@ -163,17 +166,98 @@ def _find_start_menu(name):
     return None
 
 
+def _snapshot_pids():
+    """Return the set of currently running process PIDs."""
+    try:
+        return {p.pid for p in psutil.process_iter(["pid"])}
+    except Exception:
+        return set()
+
+
+def _activate_windows(pids, key=None):
+    """Fully show & focus the window of a newly launched app.
+
+    Works around Windows' foreground-lock with two standard techniques:
+      1. Simulated ALT-key press (the classic trick automation tools use) so a
+         background process is allowed to call SetForegroundWindow.
+      2. Matching windows by process name so Store/UWP apps (whose real window
+         PID differs from the launcher) get picked up too.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        user32 = ctypes.windll.user32
+        SW_SHOWNORMAL = 1
+        key = (key or "").lower().replace(" ", "")
+
+        def _collect():
+            found = []
+
+            @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            def _cb(hwnd, lparam):
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                wnd_pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(wnd_pid))
+                pid = wnd_pid.value
+                if pid in pids:
+                    found.append(hwnd)
+                    return True
+                if key:
+                    try:
+                        pname = psutil.Process(pid).name().lower().replace(" ", "")
+                        if key in pname:
+                            found.append(hwnd)
+                    except Exception:
+                        pass
+                return True
+
+            user32.EnumWindows(_cb, 0)
+            return found
+
+        # The window may take a moment to appear; poll for up to ~8s.
+        for _ in range(26):
+            found = _collect()
+            if found:
+                _force_foreground(found[0])
+                return
+            time.sleep(0.3)
+    except Exception:
+        pass
+
+
+def _force_foreground(hwnd):
+    """Show + activate a window even from a background process."""
+    try:
+        user32 = ctypes.windll.user32
+        SW_SHOWNORMAL = 1
+        VK_MENU = 0x12
+        KEYEVENTF_KEYUP = 0x0002
+
+        user32.ShowWindow(hwnd, SW_SHOWNORMAL)
+        user32.BringWindowToTop(hwnd)
+        # Simulated Alt press unlocks SetForegroundWindow for our process.
+        user32.keybd_event(VK_MENU, 0, 0, 0)
+        user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+        user32.SetForegroundWindow(hwnd)
+        user32.BringWindowToTop(hwnd)
+    except Exception:
+        pass
+
+
 def open_app(name):
     app = next((k for k in APP_ALIASES if k in name), None)
     if not app:
         app = name.strip()
     target = APP_ALIASES.get(app, app)
+    before = _snapshot_pids()
     # Store apps first (most reliable for modern apps like WhatsApp, Teams, etc.)
     if not target.startswith("ms-"):
         store = _find_store_app(app)
         if store:
             try:
                 os.startfile(f"shell:AppsFolder\\{store}")
+                _activate_windows(_snapshot_pids() - before, key=app)
                 return True
             except Exception:
                 pass
@@ -182,21 +266,28 @@ def open_app(name):
     if lnk:
         try:
             os.startfile(lnk)
+            _activate_windows(_snapshot_pids() - before, key=app)
             return True
         except Exception:
             pass
     if target.startswith("ms-"):
         os.startfile(target)
+        _activate_windows(_snapshot_pids() - before, key=app)
         return True
     exe = _find_executable(target)
     if exe:
-        return _launch(exe)
+        _launch(exe)
+        _activate_windows(_snapshot_pids() - before, key=app)
+        return True
     # Fall back: scan installed programs for a fuzzy name match.
     exe = _find_any_app(app)
     if exe:
-        return _launch(exe)
+        _launch(exe)
+        _activate_windows(_snapshot_pids() - before, key=app)
+        return True
     try:
         os.startfile(target)
+        _activate_windows(_snapshot_pids() - before, key=app)
         return True
     except Exception:
         return False

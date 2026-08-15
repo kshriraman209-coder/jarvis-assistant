@@ -33,7 +33,10 @@ SLEEP_REPLY = "Standing by, sir."
 UNKNOWN_REPLY = "I'm sorry, I didn't catch that."
 GOODBYE = "Signing off. Goodbye, sir."
 
-TTS_RATE = 180
+TTS_RATE = 175
 TTS_VOLUME = 1.0
+# Prefer a British-accent voice (classic JARVIS feel). Falls back to any voice.
+TTS_VOICE_PREFERENCE = "hazel"
+TTS_VOICE_FALLBACKS = ("zira", "david", "mark", "aria")
 
 script_dir = BASE_DIR
